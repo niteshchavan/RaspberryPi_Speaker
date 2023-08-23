@@ -1,5 +1,4 @@
-nitesh@zero:~ $
-nitesh@zero:~ $
+
 nitesh@zero:~ $ pulseau
 -bash: pulseau: command not found
 nitesh@zero:~ $ alsamixer
