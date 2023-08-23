@@ -1,4 +1,3 @@
-https://unix.stackexchange.com/questions/65246/change-pulseaudio-input-output-from-shell
 nitesh@zero:~ $
 nitesh@zero:~ $
 nitesh@zero:~ $ pulseau
