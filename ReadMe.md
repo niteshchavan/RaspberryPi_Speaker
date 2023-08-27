@@ -13,7 +13,7 @@ Renames files and remove junk caracters
 
 ## How to make mplayer continue after pausing it via a named pipe?
 
-# Create a named pipe.
+### Create a named pipe.
 
 mkfifo /tmp/mplayer-control
 
