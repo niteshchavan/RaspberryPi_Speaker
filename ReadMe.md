@@ -13,8 +13,8 @@ Renames files and remove junk caracters
 
 ## How to make mplayer continue after pausing it via a named pipe?
 
-### Create a named pipe.
-
+Create a named pipe.
+```
 mkfifo /tmp/mplayer-control
 
 mplayer -slave -input file=/tmp/mplayer-control mymusic.mp3
@@ -26,3 +26,4 @@ echo "quit" > /tmp/mplayer-control
 echo "volume +10" > /tmp/mplayer-control
 
 echo "volume -10" > /tmp/mplayer-control
+```
