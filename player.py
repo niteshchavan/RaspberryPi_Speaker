@@ -85,6 +85,7 @@ current_song_process = None
 # Global variable to control autoplay
 autoplay_enabled = True
 
+# Long Press Button Time
 buttonExit_pressed_time = None
 
 
@@ -102,32 +103,43 @@ def play_selected_file(selected_file):
     full_file_path = os.path.join(folder_path, selected_file)
     cmd = f"mplayer -slave -input file=/tmp/mplayer-control -vo null -novideo {shlex.quote(full_file_path)}"
     current_song_process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
-    #current_song_process.wait()  # Wait for the song to finish
+
     global autoplay_enabled
     autoplay_enabled = True
 
 def autoplay_next_song():
-    global selected_index, autoplay_enabled
+    global selected_index, autoplay_enabled, scroll_position
     try:
         while autoplay_enabled:
             time.sleep(0.1)
             if current_song_process and current_song_process.poll() is not None:
                 if autoplay_enabled and selected_index < len(file_list) - 1:
                     selected_index += 1
+                    print("selected_index:", selected_index)
+                    if selected_index >= scroll_position + 3:
+                        scroll_position += 1
+                    
+                    selected_file = file_list[selected_index]
+                    play_selected_file(selected_file) 
+
+                    display()
+                elif scroll_position + 3 < len(file_list):
+                    scroll_position += 1
                     selected_file = file_list[selected_index]
                     play_selected_file(selected_file)
                     print("Autoplay:", selected_file)
                     display()
     except KeyboardInterrupt:
         pass
-    
+
+
     
 # Start the autoplay thread
 autoplay_thread = threading.Thread(target=autoplay_next_song)
 autoplay_thread.daemon = True  # This allows the thread to exit when the main program exits
 autoplay_thread.start()
 
-
+#Power Sequence Animation
 def poweroff():
     draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
     draw.text((20, 0), "Shutting Down", font=font, fill=255)
@@ -159,6 +171,7 @@ def display():
     # Draw a black filled box to clear the image.
     draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
 
+    # Show IP Address
     cmd = "hostname -I | cut -d\' \' -f1"
     IP = subprocess.check_output(cmd, shell=True)
     draw.text((0, 0), "IP: " + str(IP, 'utf-8'), font=font, fill=255)
@@ -247,8 +260,8 @@ try:
                     else:
                         print("Playing")
                         os.killpg(os.getpgid(current_song_process.pid), signal.SIGTERM)
-                        autoplay_enabled = False
-                        print("Autoplay: OFF")
+                        #autoplay_enabled = False
+                        #print("Autoplay: OFF")
                 except ProcessLookupError:
                     pass
                     
