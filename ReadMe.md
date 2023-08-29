@@ -48,7 +48,7 @@ pip3 install Pillow
 # From raspi-config enable I2C
 
 ## Raspberry Pi Zero Bluetooth Speaker Cmd Output
-
+https://gist.github.com/actuino/9548329d1bba6663a63886067af5e4cb
 https://unix.stackexchange.com/questions/65246/change-pulseaudio-input-output-from-shell
 ## Follow Second
 https://aptx1337.github.io/posts/general/surround_soundsystem_pulseaudio.html
