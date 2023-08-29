@@ -31,6 +31,21 @@ power on
 trust "Mac address"
 
 ```
+# Install Python Envoirment 
+```
+apt-get install python3-venv
+
+python -m venv player
+```
+# For Oled Display use adafruit-circuitpython-ssd1306 and Pillow
+
+```
+pip3 install adafruit-circuitpython-ssd1306
+
+pip3 install Pillow
+
+```
+# From raspi-config enable I2C
 
 ## Raspberry Pi Zero Bluetooth Speaker Cmd Output
 
