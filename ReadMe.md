@@ -13,6 +13,25 @@ sudo apt install pulseaudio-module-bluetooth
 sudo usermod -a -G bluetooth nitesh
 ```
 
+# Login with nitesh user and start pulse audio
+
+```
+systemctl --user start pulseaudio
+
+```
+# start bluetooth controller
+
+```
+bluetoothctl
+
+discoverable on
+
+power on
+
+trust "Mac address"
+
+```
+
 ## Raspberry Pi Zero Bluetooth Speaker Cmd Output
 
 https://unix.stackexchange.com/questions/65246/change-pulseaudio-input-output-from-shell
