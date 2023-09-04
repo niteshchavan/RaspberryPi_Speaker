@@ -14,6 +14,8 @@ from PIL import Image, ImageDraw, ImageFont
 subprocess.run('rm /tmp/mplayer-control', shell=True)
 subprocess.run('mkfifo /tmp/mplayer-control', shell=True)
 subprocess.run('killall mplayer', shell=True)
+
+
 # Define the Reset Pin
 oled_reset = digitalio.DigitalInOut(board.D4)
 
@@ -43,6 +45,16 @@ buttonExit.direction = digitalio.Direction.INPUT
 buttonExit.pull = digitalio.Pull.UP
 
 
+#Button Volume Up GPIO10
+Volup = digitalio.DigitalInOut(board.D9)
+Volup.direction = digitalio.Direction.INPUT
+Volup.pull = digitalio.Pull.UP
+
+#Button Volume Down GPIO9
+Voldown = digitalio.DigitalInOut(board.D10)
+Voldown.direction = digitalio.Direction.INPUT
+Voldown.pull = digitalio.Pull.UP
+
 
 # Display Parameters
 WIDTH = 128
@@ -69,7 +81,7 @@ draw.rectangle((0, 0, oled.width, oled.height), outline=255, fill=255)
 font = ImageFont.truetype('PixelOperator.ttf', 16)
 
 # Path to the folder containing the MP4 files
-folder_path = "/home/nitesh/oled/mp4"  # Replace with the actual path
+folder_path = "/root/player/mp4"  # Replace with the actual path
 
 # List MP4 files in the folder
 file_list = [file for file in os.listdir(folder_path) if file.endswith(".mp4")]
@@ -82,63 +94,29 @@ scroll_position = 0  # Start scrolling from the beginning
 # Keep track of the process running the song
 current_song_process = None
 
-# Global variable to control autoplay
-autoplay_enabled = True
+# Check Player After Exit
+player_status = None
 
 # Long Press Button Time
 buttonExit_pressed_time = None
 
 
-def play_selected_file(selected_file):
-    global current_song_process
+#-demuxer mov
+cmd = "mplayer -slave -quiet -idle -demuxer mov -vo null -novideo -input file=/tmp/mplayer-control"
+current_song_process = subprocess.Popen(cmd, shell=True, text=True,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    # Terminate the previous song process if it exists
-    if current_song_process:
-        try:
-            os.killpg(os.getpgid(current_song_process.pid), signal.SIGTERM)
-            current_song_process.wait()
-        except ProcessLookupError:
-            pass
-    
-    full_file_path = os.path.join(folder_path, selected_file)
-    cmd = f"mplayer -slave -input file=/tmp/mplayer-control -vo null -novideo {shlex.quote(full_file_path)}"
-    current_song_process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
-
-    global autoplay_enabled
-    autoplay_enabled = True
-
-def autoplay_next_song():
-    global selected_index, autoplay_enabled, scroll_position
-    try:
-        while autoplay_enabled:
-            time.sleep(0.1)
-            if current_song_process and current_song_process.poll() is not None:
-                if autoplay_enabled and selected_index < len(file_list) - 1:
-                    selected_index += 1
-                    print("selected_index:", selected_index)
-                    if selected_index >= scroll_position + 3:
-                        scroll_position += 1
-                    
-                    selected_file = file_list[selected_index]
-                    play_selected_file(selected_file) 
-
-                    display()
-                elif scroll_position + 3 < len(file_list):
-                    scroll_position += 1
-                    selected_file = file_list[selected_index]
-                    play_selected_file(selected_file)
-                    print("Autoplay:", selected_file)
-                    display()
-    except KeyboardInterrupt:
-        pass
-
+def exit():
+    global player_status
+    subprocess.run('echo "quit" > /tmp/mplayer-control', shell=True)
+    player_status = False
+    draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
+    draw.text((10, 0), "Player is Offline", font=font, fill=255)
+    draw.text((10, 20), "Long Press OFF", font=font, fill=255)
+    draw.text((10, 40), "Press Ok to Play", font=font, fill=255)            
+    oled.image(image)
+    oled.show()
 
     
-# Start the autoplay thread
-autoplay_thread = threading.Thread(target=autoplay_next_song)
-autoplay_thread.daemon = True  # This allows the thread to exit when the main program exits
-autoplay_thread.start()
-
 #Power Sequence Animation
 def poweroff():
     draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
@@ -198,73 +176,107 @@ def display():
     
 display()
 
+# Initialize previous_line variable
+previous_line = ""
+
+def load_next_song():
+    global selected_index, scroll_position
+    selected_index += 1       
+    scroll_position = selected_index
+    if selected_index < len(file_list):
+        selected_file = file_list[selected_index]
+        full_file_path = os.path.join(folder_path, selected_file)
+        subprocess.run(f'echo "loadfile {shlex.quote(full_file_path)}" > /tmp/mplayer-control', shell=True)
+        print(f"Autoplaying: {shlex.quote(full_file_path)}")
+     
+    display()
+
+# Function to continuously read and print the last line of current_song_process.stdout
+def read_last_line():
+    global previous_line
+    try:
+        while True:
+            time.sleep(0.1)
+            last_line = None
+            try:
+                for line in current_song_process.stdout:
+                    last_line = line.strip()  # Update last_line with each line
+                    
+                    if last_line != previous_line: 
+                        print(last_line)  # Print each line if needed
+                        if last_line == 'ANS_ERROR=PROPERTY_UNAVAILABLE':
+                            load_next_song()
+                        else:
+                            subprocess.run('echo "get_property percent_pos" > /tmp/mplayer-control', shell=True)
+                        previous_line = last_line  # Update previous_line
+            except subprocess.TimeoutExpired:
+                print("current_song_process stopped responding")
+                break
+    
+    except KeyboardInterrupt:
+        pass    
+read_thread = threading.Thread(target=read_last_line, daemon=True)
+read_thread.start()            
+
+
 try:
     while True:
         time.sleep(0.1)
-        
+
         if not buttonUp.value:
-            print("Up")
             if selected_index > 0:
                 selected_index -= 1
-                print("selected_index:", selected_index)
                 if selected_index < scroll_position:
                     scroll_position = selected_index
                 display()
             elif scroll_position > 0:
                 scroll_position -= 1
                 display()
+            print("UP","selected_index:", selected_index, "scroll_position:", scroll_position)
             time.sleep(0.2)
             
         if not buttonDown.value:
-            print("Down")
             if selected_index < len(file_list) - 1:
                 selected_index += 1
-                print("selected_index:", selected_index)
                 if selected_index >= scroll_position + 3:
                     scroll_position += 1
                 display()
             elif scroll_position + 3 < len(file_list):
                 scroll_position += 1
                 display()
+            print("Down","selected_index:", selected_index, "scroll_position:", scroll_position)
             time.sleep(0.2)
             
         if not buttonOk.value:
-            print("OK")
+            display()
+            if player_status == False:
+                print("Player is offline restarting player")
+                current_song_process = subprocess.Popen(cmd, shell=True, text=True,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             selected_file = file_list[selected_index]
-            play_selected_file(selected_file)
-            print(selected_file)
+            full_file_path = os.path.join(folder_path, selected_file)
+            subprocess.run(f'echo "loadfile {shlex.quote(full_file_path)}" > /tmp/mplayer-control', shell=True)
+            print(f"{shlex.quote(full_file_path)}")
             display()
             time.sleep(0.2)
             
         if not button_play_pause.value:
             print("button_play_pause")
+            subprocess.run('echo "pause" > /tmp/mplayer-control', shell=True)
+            time.sleep(0.2)
 
-            if current_song_process:
-                try:
-                    if current_song_process.poll() is not None:
-                        print("Not Playing")
-                    else:
-                        print("Playing")
-                        subprocess.run('echo "pause" > /tmp/mplayer-control', shell=True)
-                except ProcessLookupError:
-                    pass   
-            #display()
+        if not Volup.value:
+            subprocess.run('amixer set "Speaker" 3%+', shell=True)
+            print("Volume UP")
+            time.sleep(0.2)
+            
+        if not Voldown.value:
+            subprocess.run('amixer set "Speaker" 3%-', shell=True)
+            print("Volume Down")
             time.sleep(0.2)
         
         if not buttonExit.value:
             print("buttonExit")
-            if current_song_process:
-                try:
-                    if current_song_process.poll() is not None:
-                        print("Not Playing")
-                    else:
-                        print("Playing")
-                        os.killpg(os.getpgid(current_song_process.pid), signal.SIGTERM)
-                        #autoplay_enabled = False
-                        #print("Autoplay: OFF")
-                except ProcessLookupError:
-                    pass
-                    
+            exit()
 
             if buttonExit_pressed_time is None:
                 buttonExit_pressed_time = time.time()
@@ -277,6 +289,7 @@ try:
             time.sleep(0.2)
         else:
             buttonExit_pressed_time = None  # Reset the timer when the button is released
+  
   
 except KeyboardInterrupt:
     pass
