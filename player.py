@@ -15,7 +15,6 @@ subprocess.run('rm /tmp/mplayer-control', shell=True)
 subprocess.run('mkfifo /tmp/mplayer-control', shell=True)
 subprocess.run('killall mplayer', shell=True)
 
-
 # Define the Reset Pin
 oled_reset = digitalio.DigitalInOut(board.D4)
 
@@ -101,20 +100,11 @@ player_status = None
 buttonExit_pressed_time = None
 
 
+    
 #-demuxer mov
 cmd = "mplayer -slave -quiet -idle -demuxer mov -vo null -novideo -input file=/tmp/mplayer-control"
 current_song_process = subprocess.Popen(cmd, shell=True, text=True,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-def exit():
-    global player_status
-    subprocess.run('echo "quit" > /tmp/mplayer-control', shell=True)
-    player_status = False
-    draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
-    draw.text((10, 0), "Player is Offline", font=font, fill=255)
-    draw.text((10, 20), "Long Press OFF", font=font, fill=255)
-    draw.text((10, 40), "Press Ok to Play", font=font, fill=255)            
-    oled.image(image)
-    oled.show()
+       
 
     
 #Power Sequence Animation
@@ -173,8 +163,10 @@ def display():
     # Display image
     oled.image(image)
     oled.show()
-    
+
+# Start Display    
 display()
+
 
 # Initialize previous_line variable
 previous_line = ""
@@ -251,7 +243,12 @@ try:
             display()
             if player_status == False:
                 print("Player is offline restarting player")
+                subprocess.run('rm /tmp/mplayer-control', shell=True)
+                subprocess.run('mkfifo /tmp/mplayer-control', shell=True)
+                subprocess.run('killall mplayer', shell=True)
                 current_song_process = subprocess.Popen(cmd, shell=True, text=True,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                player_status = True
+                
             selected_file = file_list[selected_index]
             full_file_path = os.path.join(folder_path, selected_file)
             subprocess.run(f'echo "loadfile {shlex.quote(full_file_path)}" > /tmp/mplayer-control', shell=True)
@@ -276,8 +273,16 @@ try:
         
         if not buttonExit.value:
             print("buttonExit")
-            exit()
 
+            subprocess.run('echo "quit" > /tmp/mplayer-control', shell=True)
+            subprocess.run('rm /tmp/mplayer-control', shell=True)
+            player_status = False
+            draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
+            draw.text((10, 0), "Player is Offline", font=font, fill=255)
+            draw.text((10, 20), "Long Press OFF", font=font, fill=255)
+            draw.text((10, 40), "Press Ok to Play", font=font, fill=255)            
+            oled.image(image)
+            oled.show()
             if buttonExit_pressed_time is None:
                 buttonExit_pressed_time = time.time()
             else:
